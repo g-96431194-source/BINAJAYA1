@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ms">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Tapak Bina Jaya - Seret KVKV</title>
+<style>
+body{margin:0;background:#f4eee3;font-family:Arial,sans-serif;color:#27464a}
+*{box-sizing:border-box}.screen{display:none;min-height:100vh;padding:18px}.show{display:flex;align-items:center;justify-content:center}
+.card{width:min(900px,100%);background:#fffdf8;border-radius:24px;padding:24px;box-shadow:0 8px 28px #0002}
+h1{text-align:center;margin:5px;font-size:38px}.sub{text-align:center;color:#607d80}
+input{display:block;width:100%;padding:16px;border:2px solid #aac3bf;border-radius:14px;font-size:20px;margin:20px 0}
+button{padding:14px 22px;border:0;border-radius:14px;background:#315f66;color:#fff;font-size:18px;font-weight:bold;margin:5px}.secondary{background:#dce9e5;color:#315f66}
+.board{width:min(900px,100%);background:#dcbf96;border:8px solid #95683e;border-radius:24px;padding:14px}
+.title{text-align:center;font-size:25px;font-weight:900;letter-spacing:2px;margin-bottom:10px}
+.lane{background:#fffaf0;border-radius:15px;padding:12px;margin:9px 0;text-align:center}.label{font-weight:900;color:#765431;font-size:14px}
+.pic{font-size:52px;height:65px;display:flex;align-items:center;justify-content:center}
+.slots{display:flex;justify-content:center;gap:12px;margin:10px 0}.slot{width:145px;height:68px;border:3px dashed #769a96;border-radius:14px;background:#f8fffd;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900}.slot.over{background:#d8eee8}
+.bank{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:14px auto;max-width:900px}
+.tile{background:white;border:3px solid #6b9792;border-radius:14px;padding:14px 20px;font-size:23px;font-weight:900;cursor:grab;user-select:none;touch-action:none;position:relative;z-index:5}
+.tile.dragging{opacity:.45}.feedback{text-align:center;font-size:21px;font-weight:bold;min-height:30px}.score{text-align:center;font-weight:bold;margin:8px}
+table{width:100%;border-collapse:collapse;margin-top:15px}td,th{padding:10px;border-bottom:1px solid #ddd;text-align:center}th{background:#e6efec}.rank{font-size:25px}
+#dragGhost{position:fixed;display:none;z-index:9999;pointer-events:none;background:white;border:3px solid #315f66;border-radius:14px;padding:14px 20px;font-size:23px;font-weight:900;box-shadow:0 8px 20px #0003}
+@media(max-width:600px){h1{font-size:30px}.card{padding:17px}.board{border-width:5px}.slot{width:43%;height:64px}.tile{padding:13px 16px;font-size:20px}}
+</style>
+</head>
+<body>
+
+<section id="home" class="screen show">
+<div class="card">
+<div class="title">TAPAK BINA JAYA</div>
+<h1>🎮 SERET & SUSUN KVKV</h1>
+<p class="sub">5 perkataan • KV + KV</p>
+<input id="nama" maxlength="30" placeholder="Masukkan nama murid">
+<div style="text-align:center"><button id="mula">MULA BERMAIN</button></div>
+<p class="sub">Sentuh dan tahan suku kata, kemudian seret ke kotak.</p>
+</div>
+</section>
+
+<section id="game" class="screen">
+<div style="width:min(900px,100%);margin:auto">
+<div class="score" id="status"></div>
+<div class="board">
+<div class="title">TAPAK BINA JAYA</div>
+<div class="lane"><div class="label">GAMBAR</div><div class="pic" id="pic">👕</div></div>
+<div class="lane">
+<div class="label">SUKU KATA KVKV — SERET & SUSUN</div>
+<div class="slots"><div class="slot" id="s0"></div><div class="slot" id="s1"></div></div>
+</div>
+<div class="lane"><div class="label">PERKATAAN</div><div class="pic" id="word">—</div></div>
+</div>
+<div class="bank" id="bank"></div>
+<div class="feedback" id="feedback"></div>
+<div style="text-align:center"><button id="semak">SEMAK</button><button class="secondary" id="reset">RESET</button></div>
+</div>
+</section>
+
+<section id="finish" class="screen">
+<div class="card">
+<div class="title">TAPAK BINA JAYA</div>
+<h1>🏆 SELESAI!</h1>
+<h2 id="who" style="text-align:center"></h2>
+<p id="final" style="text-align:center;font-size:23px;font-weight:bold"></p>
+<div id="ranking"></div>
+<div style="text-align:center;margin-top:15px"><button id="again">MAIN LAGI</button><button class="secondary" id="menu">MENU</button></div>
+</div>
+</section>
+
+<div id="dragGhost"></div>
+
+<script>
+const qs=[
+ {w:"baju",a:["ba","ju"],p:"👕"},
+ {w:"buku",a:["bu","ku"],p:"📚"},
+ {w:"cili",a:["ci","li"],p:"🌶️"},
+ {w:"kuda",a:["ku","da"],p:"🐴"},
+ {w:"roti",a:["ro","ti"],p:"🍞"}
+];
+let nama="",idx=0,score=0,placed=["",""],dragging=null,ghost=document.getElementById("dragGhost");
+
+function screen(id){document.querySelectorAll(".screen").forEach(x=>x.classList.remove("show"));document.getElementById(id).classList.add("show")}
+function start(){nama=document.getElementById("nama").value.trim();if(!nama){alert("Sila masukkan nama murid.");return}idx=0;score=0;screen("game");load()}
+document.getElementById("mula").onclick=start;
+
+function load(){
+ placed=["",""];document.getElementById("status").textContent=`Soalan ${idx+1}/5  •  Skor ${score}`;
+ document.getElementById("pic").textContent=qs[idx].p;
+ document.getElementById("word").textContent="—";document.getElementById("feedback").textContent="";
+ ["s0","s1"].forEach(id=>{let e=document.getElementById(id);e.textContent="";e.dataset.value=""});
+ let arr=[...qs[idx].a];
+ // satu pengacau KV
+ const pool=["ba","bu","ci","ku","ro"].filter(x=>!arr.includes(x));
+ arr.push(pool[(idx+2)%pool.length]);
+ arr.sort(()=>Math.random()-.5);
+ const bank=document.getElementById("bank");bank.innerHTML="";
+ arr.forEach(v=>{
+  const t=document.createElement("div");t.className="tile";t.textContent=v;t.dataset.value=v;
+  t.addEventListener("pointerdown",beginDrag);
+  bank.appendChild(t);
+ });
+}
+function beginDrag(e){
+ if(e.button!==undefined&&e.button!==0)return;
+ dragging=e.currentTarget;dragging.classList.add("dragging");
+ ghost.textContent=dragging.dataset.value;ghost.style.display="block";
+ moveGhost(e.clientX,e.clientY);
+ dragging.setPointerCapture?.(e.pointerId);
+}
+function moveGhost(x,y){ghost.style.left=(x-35)+"px";ghost.style.top=(y-35)+"px"}
+document.addEventListener("pointermove",e=>{if(dragging){e.preventDefault();moveGhost(e.clientX,e.clientY)}},{passive:false});
+document.addEventListener("pointerup",e=>{
+ if(!dragging)return;
+ const target=document.elementFromPoint(e.clientX,e.clientY);
+ const slot=target&&target.closest(".slot");
+ if(slot) put(slot,dragging.dataset.value);
+ dragging.classList.remove("dragging");dragging=null;ghost.style.display="none";
+});
+function put(slot,v){
+ if(slot.dataset.value)return;
+ const i=slot.id==="s0"?0:1;
+ // jangan benarkan suku kata sama digunakan dua kali
+ if(placed.includes(v))return;
+ placed[i]=v;slot.dataset.value=v;slot.textContent=v;
+ document.getElementById("word").textContent=placed.filter(Boolean).join("-");
+}
+document.getElementById("semak").onclick=()=>{
+ if(placed.includes("")){document.getElementById("feedback").textContent="Lengkapkan kedua-dua suku kata dahulu.";return}
+ const ok=placed.join("")===qs[idx].w;
+ document.getElementById("feedback").textContent=ok?"✅ Betul!":"❌ Belum betul.";
+ if(ok){score++;document.getElementById("word").textContent=qs[idx].w}
+ document.getElementById("status").textContent=`Soalan ${idx+1}/5  •  Skor ${score}`;
+ document.getElementById("semak").disabled=true;
+ setTimeout(()=>{document.getElementById("semak").disabled=false;idx++;if(idx<5)load();else finish()},900);
+};
+document.getElementById("reset").onclick=()=>load();
+
+function finish(){
+ let a=JSON.parse(localStorage.getItem("BJ5")||"[]");
+ a.push({n:nama,s:score});a.sort((x,y)=>y.s-x.s);
+ localStorage.setItem("BJ5",JSON.stringify(a.slice(0,30)));
+ document.getElementById("who").textContent=nama;
+ document.getElementById("final").textContent=`Jawapan betul: ${score} / 5`;
+ let h="<h2 style='text-align:center'>🏅 Papan Kedudukan</h2><table><tr><th>Kedudukan</th><th>Nama</th><th>Betul</th></tr>";
+ a.forEach((x,i)=>h+=`<tr><td class='rank'>${i+1}</td><td>${safe(x.n)}</td><td><b>${x.s}/5</b></td></tr>`);
+ document.getElementById("ranking").innerHTML=h+"</table>";screen("finish");
+}
+function safe(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+document.getElementById("again").onclick=()=>{idx=0;score=0;screen("game");load()};
+document.getElementById("menu").onclick=()=>screen("home");
+</script>
+</body>
+</html>
